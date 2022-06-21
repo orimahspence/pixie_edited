@@ -27,7 +27,7 @@ data:
                 name: local_route
                 virtual_hosts:
                 - name: local_service
-                  domains: ["*"]
+                  domains: ["internal-pixie-np.digital-dfp-dev.cvshealth.com"]
                   routes:
                   - match:
                       prefix: "/px.api"
@@ -40,7 +40,7 @@ data:
                       cluster: api_service
                   cors:
                     allow_origin_string_match:
-                    - suffix: "withpixie.ai"
+                    - suffix: "internal-pixie-np.digital-dfp-dev.cvshealth.com"
                     allow_methods: GET, PUT, DELETE, POST, OPTIONS
                     allow_headers: >
                       keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,

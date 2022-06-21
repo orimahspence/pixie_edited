@@ -23,26 +23,31 @@ namespace="plc"
 export LANG=C
 export LC_ALL=C
 
+kubectl delete secret cloud-auth-secrets -n plc --ignore-not-found
 kubectl create secret generic -n "${namespace}" \
   cloud-auth-secrets \
   --from-literal=jwt-signing-key="$(< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)"
 
+kubectl delete secret pl-hydra-secrets -n plc --ignore-not-found
 kubectl create secret generic -n "${namespace}" \
   pl-hydra-secrets \
   --from-literal=SECRETS_SYSTEM="$(< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)" \
   --from-literal=OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT="$(< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)" \
   --from-literal=CLIENT_SECRET="$(< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w 64 | head -n 1)"
 
+kubectl delete secret pl-db-secrets -n plc --ignore-not-found
 kubectl create secret generic -n "${namespace}" \
   pl-db-secrets \
   --from-literal=PL_POSTGRES_USERNAME="pl" \
   --from-literal=PL_POSTGRES_PASSWORD="pl" \
   --from-literal=database-key="$(< /dev/urandom tr -dc 'a-zA-Z0-9#$%&().' | fold -w 24 | head -n 1)"
 
+kubectl delete secret cloud-session-secrets -n plc --ignore-not-found
 kubectl create secret generic -n "${namespace}" \
   cloud-session-secrets \
   --from-literal=session-key="$(< /dev/urandom tr -dc 'a-zA-Z0-9' | fold -w 24 | head -n 1)"
 
+kubectl delete secret service_tls_certs -n plc --ignore-not-found
 SERVICE_TLS_CERTS="$(mktemp -d)"
 pushd "${SERVICE_TLS_CERTS}" || exit 1
 
@@ -81,6 +86,7 @@ openssl req -new -key client.key -out client.csr -config ssl.conf -subj "/O=Pixi
 openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 \
     -out client.crt -extensions req_ext -extfile ssl.conf
 
+kubectl delete secret service-tls-certs -n plc --ignore-not-found
 kubectl create secret generic -n "${namespace}" \
   service-tls-certs \
   --from-file=ca.crt=./ca.crt \
@@ -98,8 +104,9 @@ PROXY_KEY_FILE="${PROXY_TLS_CERTS}/server.key"
 mkcert \
   -cert-file "${PROXY_CERT_FILE}" \
   -key-file "${PROXY_KEY_FILE}" \
-  dev.withpixie.dev "*.dev.withpixie.dev" localhost 127.0.0.1 ::1
+  internal-pixie-np.digital-dfp-dev.cvshealth.com "*.internal-pixie-np.digital-dfp-dev.cvshealth.com" localhost 127.0.0.1 ::1
 
+kubectl delete secret cloud-proxy-tls-certs -n plc --ignore-not-found
 kubectl create secret tls -n "${namespace}" \
   cloud-proxy-tls-certs \
   --cert="${PROXY_CERT_FILE}" \

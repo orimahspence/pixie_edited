@@ -4,5 +4,5 @@ kind: ConfigMap
 metadata:
   name: pl-domain-config
 data:
-  PL_DOMAIN_NAME: withpixie.ai
+  PL_DOMAIN_NAME: internal-pixie-np.digital-dfp-dev.cvshealth.com
   PASSTHROUGH_PROXY_PORT: ""

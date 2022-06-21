@@ -1,0 +1,28 @@
+# Note1: the lastest version k8s need ingressClass!
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+  name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    networking.gke.io/managed-certificates: cloud-ingress-managed-cert
+    networking.gke.io/v1beta1.FrontendConfig: frontend-config
+    # Note2: we do need this line to ensure the cert config
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  labels:
+    app: pl-cloud
+  name: cloud-ingress
+  namespace: plc
+spec:
+  ingressClassName: nginx
+...

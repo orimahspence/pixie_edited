@@ -1,0 +1,703 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: nats
+  namespace: plc
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: nats-server
+  namespace: plc
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: stan
+  namespace: plc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: plc:nats-server
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: plc:stan
+rules:
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - '*'
+- apiGroups:
+  - nats.io
+  resources:
+  - natsclusters
+  - natsserviceroles
+  verbs:
+  - '*'
+- apiGroups:
+  - streaming.nats.io
+  resources:
+  - natsstreamingclusters
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - pods
+  - services
+  - serviceaccounts
+  - serviceaccounts/token
+  - endpoints
+  - events
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: plc:nats-server-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: plc:nats-server
+subjects:
+- kind: ServiceAccount
+  name: nats-server
+  namespace: plc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: plc:stan-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: plc:stan
+subjects:
+- kind: ServiceAccount
+  name: stan
+  namespace: plc
+---
+apiVersion: v1
+data:
+  nats.conf: |
+    pid_file: "/var/run/nats/nats.pid"
+    http: 8222
+
+    tls {
+      ca_file: "/etc/nats-server-tls-certs/ca.crt",
+      cert_file: "/etc/nats-server-tls-certs/server.crt",
+      key_file: "/etc/nats-server-tls-certs/server.key",
+      timeout: 3
+    }
+    cluster {
+      port: 6222
+      routes [
+        nats://pl-nats-0.pl-nats:6222
+        nats://pl-nats-1.pl-nats:6222
+        nats://pl-nats-2.pl-nats:6222
+      ]
+
+      tls {
+        ca_file: "/etc/nats-server-tls-certs/ca.crt",
+        cert_file: "/etc/nats-server-tls-certs/server.crt",
+        key_file: "/etc/nats-server-tls-certs/server.key",
+        timeout: 3
+      }
+
+      advertise: $CLUSTER_ADVERTISE
+      connect_retries: 30
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: nats-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  ANNOUNCE_WIDGET_URL: ""
+  ANNOUNCEMENT_ENABLED: "false"
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-announcement-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  PL_AUTH_CONNECTOR_CALLBACK_URL: ""
+  PL_AUTH_CONNECTOR_NAME: ""
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-auth-connector-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  PL_SENTRY_DSN: ""
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-errors-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  PL_LD_CLIENT_ID: ""
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-ld-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  PL_AUTH_CLIENT_ID: auth-code-client
+  PL_AUTH_EMAIL_PASSWORD_CONN: ""
+  PL_AUTH_URI: oauth/hydra/oauth2/auth
+  PL_OAUTH_PROVIDER: hydra
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-oauth-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  PL_DEV_SENTRY: ""
+  PL_PROD_SENTRY: ""
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-sentry-dsn-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  cli-write-key: ""
+  ui-write-key: ""
+  write-key: ""
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+  name: segment-config
+  namespace: plc
+---
+apiVersion: v1
+data:
+  stan.conf: |
+    port: 4222
+    http: 8222
+
+    tls: {
+      ca_file: "/etc/nats/certs/ca.crt",
+      cert_file: "/etc/nats/certs/server.crt",
+      key_file: "/etc/nats/certs/server.key",
+      timeout: 3
+    }
+
+    streaming: {
+      id: pl-stan
+      ns: "nats://pl-nats:4222"
+      store: file
+      dir: /data/stan/store
+      store_limits: {
+        max_age: "24h"
+        max_channels: 0
+        max_inactivity: "24h"
+        max_subscriptions: 0
+        channels: {
+          "v2c.>": {
+            max_age: "15m"
+          }
+        }
+      }
+      tls: {
+        client_ca: "/etc/nats/certs/ca.crt",
+        client_cert: "/etc/nats/certs/server.crt",
+        client_key: "/etc/nats/certs/server.key",
+        timeout: 3
+      }
+      cluster: {
+        node_id: $POD_NAME
+        log_path: /data/stan/log
+        # Explicit names of resulting peers
+        peers: ["pl-stan-0", "pl-stan-1", "pl-stan-2"]
+      }
+    }
+kind: ConfigMap
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: stan-config
+  namespace: plc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-nats
+  name: pl-nats
+  namespace: plc
+spec:
+  clusterIP: None
+  ports:
+  - name: client
+    port: 4222
+  - name: cluster
+    port: 6222
+  - name: monitor
+    port: 8222
+  - name: metrics
+    port: 7777
+  - name: leafnodes
+    port: 7422
+  - name: gateways
+    port: 7522
+  selector:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-nats
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-stan
+  name: pl-stan
+  namespace: plc
+spec:
+  clusterIP: None
+  ports:
+  - name: metrics
+    port: 7777
+  selector:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-stan
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pl-cloud
+  name: postgres
+  namespace: plc
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: pl-cloud
+    name: postgres
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: pl-cloud
+  name: postgres-pv-claim
+  namespace: plc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100M
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: pl-cloud
+  name: postgres
+  namespace: plc
+spec:
+  selector:
+    matchLabels:
+      app: pl-cloud
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        name: postgres
+    spec:
+      containers:
+      - env:
+        - name: POSTGRES_DB
+          value: pl
+        - name: POSTGRES_USER
+          value: pl
+        - name: POSTGRES_PASSWORD
+          value: pl
+        image: postgres:13.3
+        name: postgres
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: postgres-pv-claim
+          subPath: data
+      volumes:
+      - name: postgres-pv-claim
+        persistentVolumeClaim:
+          claimName: postgres-pv-claim
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-nats
+  name: pl-nats
+  namespace: plc
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pl-cloud
+      component: cloud-deps
+      name: pl-nats
+  serviceName: pl-nats
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        component: cloud-deps
+        name: pl-nats
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - pl-nats
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - command:
+        - nats-server
+        - --config
+        - /etc/nats-config/nats.conf
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: CLUSTER_ADVERTISE
+          value: $(POD_NAME).pl-nats.$(POD_NAMESPACE).svc
+        image: nats:2.4.0-alpine3.14
+        lifecycle:
+          preStop:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - /nats-server -sl=ldm=/var/run/nats/nats.pid && /bin/sleep 60
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8222
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        name: pl-nats
+        ports:
+        - containerPort: 4222
+          name: client
+        - containerPort: 7422
+          name: leafnodes
+        - containerPort: 6222
+          name: cluster
+        - containerPort: 8222
+          name: monitor
+        - containerPort: 7777
+          name: metrics
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8222
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - mountPath: /etc/nats-config
+          name: config-volume
+        - mountPath: /etc/nats-server-tls-certs
+          name: nats-server-tls-volume
+        - mountPath: /var/run/nats
+          name: pid
+      shareProcessNamespace: true
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: nats-server-tls-volume
+        secret:
+          secretName: service-tls-certs
+      - configMap:
+          name: nats-config
+        name: config-volume
+      - emptyDir: {}
+        name: pid
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+    name: pl-stan
+  name: pl-stan
+  namespace: plc
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pl-cloud
+      component: cloud-deps
+      name: pl-stan
+  serviceName: pl-stan
+  template:
+    metadata:
+      labels:
+        app: pl-cloud
+        component: cloud-deps
+        name: pl-stan
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: name
+                  operator: In
+                  values:
+                  - pl-stan
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - args:
+        - -sc
+        - /etc/stan-config/stan.conf
+        env:
+        - name: GOGC
+          value: "400"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        image: nats-streaming:0.22.1
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8222
+          initialDelaySeconds: 10
+          timeoutSeconds: 5
+        name: pl-stan
+        ports:
+        - containerPort: 8222
+          name: monitor
+        - containerPort: 7777
+          name: metrics
+        readinessProbe:
+          httpGet:
+            path: /streaming/serverz
+            port: 8222
+          initialDelaySeconds: 120
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 0
+        volumeMounts:
+        - mountPath: /etc/stan-config
+          name: config-volume
+        - mountPath: /data/stan
+          name: stan-sts-vol
+        - mountPath: /etc/nats/certs
+          name: nats-server-tls-volume
+      volumes:
+      - configMap:
+          name: stan-config
+        name: config-volume
+      - name: nats-server-tls-volume
+        secret:
+          secretName: service-tls-certs
+  volumeClaimTemplates:
+  - metadata:
+      labels:
+        app: pl-cloud
+        component: cloud-deps
+      name: stan-sts-vol
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      volumeMode: Filesystem
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: pl-cloud
+    component: cloud-deps
+  name: pl-stan-pdb
+  namespace: plc
+spec:
+  minAvailable: 51%
+  selector:
+    matchLabels:
+      app: pl-cloud
+      component: cloud-deps
+      name: pl-stan
+---
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  labels:
+    app: pl-cloud
+  name: pl-elastic
+  namespace: plc
+spec:
+  image: gcr.io/pixie-oss/pixie-dev-public/elasticsearch:7.6.0-patched1
+  nodeSets:
+  - config:
+      node.data: true
+      node.ingest: true
+      node.master: true
+      node.store.allow_mmap: true
+    count: 2
+    name: master
+    podTemplate:
+      spec:
+        initContainers:
+        - command:
+          - sh
+          - -c
+          - |
+            bin/elasticsearch-plugin install --batch repository-gcs
+          name: install-plugins
+        - command:
+          - sh
+          - -c
+          - sysctl -w vm.max_map_count=262144
+          name: sysctl
+          securityContext:
+            privileged: true
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+  - config:
+      node.attr.data: hot
+      node.data: true
+      node.ingest: true
+      node.master: false
+      node.store.allow_mmap: true
+    count: 1
+    name: data
+    podTemplate:
+      spec:
+        containers:
+        - env:
+          - name: ES_JAVA_OPTS
+            value: -Xms2g -Xmx2g -Dlog4j2.formatMsgNoLookups=True
+          name: elasticsearch
+          resources:
+            limits:
+              cpu: 2
+              memory: 4Gi
+            requests:
+              cpu: 0.5
+              memory: 4Gi
+        initContainers:
+        - command:
+          - sh
+          - -c
+          - |
+            bin/elasticsearch-plugin install --batch repository-gcs
+          name: install-plugins
+        - command:
+          - sh
+          - -c
+          - sysctl -w vm.max_map_count=262144
+          name: sysctl
+          securityContext:
+            privileged: true
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+  version: 7.6.0
